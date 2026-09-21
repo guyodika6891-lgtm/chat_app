@@ -1,0 +1,1581 @@
+{% extends "base.html" %}
+
+{% block title %}#{{ room.name }} - Chat{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-wrapper {
+        display: flex;
+        flex-direction: column;
+        height: 75vh;
+        min-height: 500px;
+        position: relative;
+        background: #ffffff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.8);
+    }
+
+    /* ============ HEADER ============ */
+    .chat-header {
+        padding: 14px 18px;
+        background: white;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        flex-shrink: 0;
+        z-index: 10;
+    }
+    .chat-header-info h3 {
+        margin: 0;
+        font-weight: 800;
+        color: var(--dark);
+        font-size: clamp(1rem, 2.5vw, 1.2rem);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .chat-header-info small {
+        color: var(--muted);
+        font-size: 0.8rem;
+        display: block;
+        margin-top: 2px;
+    }
+
+    .online-indicator {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+        color: #065f46;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        flex-shrink: 0;
+    }
+    .online-dot {
+        width: 7px;
+        height: 7px;
+        background: #10b981;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+    }
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+        70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* ============ MESSAGES AREA ============ */
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px 16px;
+        background:
+            radial-gradient(circle at 10% 10%, rgba(99, 102, 241, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 90% 90%, rgba(236, 72, 153, 0.03) 0%, transparent 50%),
+            #fafbfc;
+        scroll-behavior: smooth;
+    }
+    .chat-messages::-webkit-scrollbar { width: 6px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 3px; }
+
+    .message-row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 14px;
+        animation: messageIn 0.3s ease-out;
+        align-items: flex-end;
+    }
+    @keyframes messageIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .message-row.own { flex-direction: row-reverse; }
+
+    .message-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--gradient-primary);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.8rem;
+        flex-shrink: 0;
+        box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+    }
+    .message-row.own .message-avatar {
+        background: var(--gradient-accent);
+        box-shadow: 0 2px 6px rgba(6, 182, 212, 0.25);
+    }
+
+    .message-bubble {
+        max-width: min(75%, 500px);
+        padding: 10px 14px;
+        border-radius: 16px;
+        background: white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        border: 1px solid #f1f5f9;
+        word-wrap: break-word;
+        position: relative;
+    }
+    .message-row.own .message-bubble {
+        background: var(--gradient-primary);
+        color: white;
+        border: none;
+        box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+    }
+
+    .message-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+        font-size: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .message-author { font-weight: 700; color: #4f46e5; }
+    .message-row.own .message-author { color: rgba(255,255,255,0.9); }
+    .message-time { color: #94a3b8; font-size: 0.7rem; }
+    .message-row.own .message-time { color: rgba(255,255,255,0.75); }
+
+    .message-content {
+        font-size: 0.92rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .message-media {
+        margin-top: 8px;
+        border-radius: 12px;
+        overflow: hidden;
+        max-width: 100%;
+    }
+    .message-media img {
+        display: block;
+        max-width: 100%;
+        max-height: 300px;
+        object-fit: cover;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    .message-media img:hover { transform: scale(1.02); }
+    .message-media video {
+        display: block;
+        max-width: 100%;
+        max-height: 400px;
+        border-radius: 12px;
+        background: black;
+    }
+    .message-media audio { display: block; width: 100%; margin-top: 6px; }
+
+    .message-file-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        background: rgba(0,0,0,0.05);
+        border-radius: 10px;
+        margin-top: 8px;
+        text-decoration: none;
+        color: inherit;
+        transition: background 0.2s;
+    }
+    .message-row.own .message-file-info {
+        background: rgba(255,255,255,0.15);
+        color: white;
+    }
+    .message-file-info:hover { background: rgba(0,0,0,0.08); }
+    .message-row.own .message-file-info:hover { background: rgba(255,255,255,0.22); }
+    .message-file-info i { font-size: 1.4rem; color: #6366f1; flex-shrink: 0; }
+    .message-row.own .message-file-info i { color: white; }
+    .message-file-info div { min-width: 0; flex: 1; }
+    .message-file-info .file-name {
+        font-weight: 600;
+        font-size: 0.85rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+    }
+    .message-file-info .file-size { font-size: 0.7rem; opacity: 0.7; }
+
+    .message-delete {
+        margin-left: auto;
+        background: rgba(239, 68, 68, 0.1);
+        border: none;
+        color: #ef4444;
+        cursor: pointer;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        font-size: 0.7rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.6;
+        transition: all 0.2s;
+    }
+    .message-bubble:hover .message-delete { opacity: 1; background: #ef4444; color: white; }
+    .message-row.own .message-delete { background: rgba(255,255,255,0.2); color: white; }
+    .message-row.own .message-delete:hover { background: rgba(255,255,255,0.35); }
+
+    /* ============ MESSAGE PULSE ============ */
+    @keyframes messagePulse {
+        0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6); }
+        70% { box-shadow: 0 0 0 15px rgba(99, 102, 241, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+    }
+    .new-message-pulse .message-bubble { animation: messagePulse 0.7s ease-out; }
+
+    /* ============ EMPTY STATE ============ */
+    .empty-chat {
+        text-align: center;
+        padding: 60px 20px;
+        color: #94a3b8;
+    }
+    .empty-chat .emoji { font-size: 4rem; opacity: 0.4; margin-bottom: 16px; }
+    .empty-chat h5 { font-weight: 700; color: var(--dark); }
+    .empty-chat p { font-size: 0.9rem; }
+
+    /* ============ INPUT AREA ============ */
+    .chat-input {
+        padding: 12px 16px;
+        background: white;
+        border-top: 1px solid #f1f5f9;
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .chat-input form {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .chat-input input[type="text"] {
+        flex: 1;
+        border: 2px solid #e2e8f0;
+        border-radius: 24px;
+        padding: 12px 20px;
+        outline: none;
+        transition: all 0.2s;
+        font-family: inherit;
+        font-size: 0.95rem;
+        background: #f8fafc;
+        min-width: 0;
+    }
+    .chat-input input[type="text"]:focus {
+        border-color: var(--primary);
+        background: white;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    }
+
+    .icon-btn {
+        border: none;
+        background: #f1f5f9;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1.1rem;
+        color: #64748b;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .icon-btn:hover { background: #e0e7ff; color: #4f46e5; transform: scale(1.1); }
+    .icon-btn:active { transform: scale(0.95); }
+    .icon-btn.recording {
+        background: #ef4444;
+        color: white;
+        animation: recPulse 1s infinite;
+    }
+    @keyframes recPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+        50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+    }
+
+    .send-btn {
+        background: var(--gradient-primary);
+        color: white;
+        font-size: 1rem;
+        padding: 12px 18px;
+        border-radius: 24px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .send-btn:hover { transform: scale(1.05); box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4); }
+    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Hide send text on mobile */
+    @media (max-width: 576px) {
+        .send-btn span { display: none; }
+        .send-btn { padding: 12px 16px; }
+        .chat-input form { gap: 6px; }
+        .icon-btn { width: 38px; height: 38px; font-size: 1rem; }
+        .message-bubble { max-width: 85%; }
+    }
+
+    /* ============ EMOJI PICKER ============ */
+    .emoji-picker-panel {
+        position: absolute;
+        bottom: 70px;
+        left: 12px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        padding: 14px;
+        width: 320px;
+        max-width: calc(100vw - 24px);
+        max-height: 300px;
+        overflow-y: auto;
+        border: 2px solid #6366f1;
+        display: none;
+        z-index: 99999;
+    }
+    .emoji-picker-panel.active { display: block; animation: popUp 0.2s ease-out; }
+    @keyframes popUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .emoji-picker-panel h6 {
+        margin: 0 0 10px 0;
+        font-weight: 700;
+        color: #4f46e5;
+        font-size: 0.85rem;
+    }
+    .emoji-picker-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+    }
+    .emoji-picker-grid button {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 6px;
+        font-size: 1.2rem;
+        cursor: pointer;
+        transition: all 0.15s;
+        line-height: 1;
+    }
+    .emoji-picker-grid button:hover {
+        background: #e0e7ff;
+        border-color: #6366f1;
+        transform: scale(1.15);
+    }
+
+    /* ============ RECORDING / UPLOAD PANELS ============ */
+    .recording-panel, .upload-status {
+        position: absolute;
+        bottom: 70px;
+        left: 12px;
+        right: 12px;
+        background: white;
+        border-radius: 14px;
+        padding: 14px 18px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        display: none;
+        z-index: 99998;
+    }
+    .recording-panel {
+        border: 2px solid #ef4444;
+        align-items: center;
+        gap: 14px;
+    }
+    .recording-panel.active { display: flex; animation: popUp 0.2s ease-out; }
+    .recording-dot {
+        width: 10px;
+        height: 10px;
+        background: #ef4444;
+        border-radius: 50%;
+        animation: recBlink 1s infinite;
+        flex-shrink: 0;
+    }
+    @keyframes recBlink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+    .recording-timer {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #ef4444;
+        font-family: monospace;
+        flex: 1;
+    }
+    .recording-actions { display: flex; gap: 8px; }
+    .rec-btn {
+        border: none;
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+    }
+    .rec-btn.cancel { background: #f1f5f9; color: #64748b; }
+    .rec-btn.cancel:hover { background: #e2e8f0; }
+    .rec-btn.send { background: var(--gradient-primary); color: white; }
+    .rec-btn.send:hover { transform: scale(1.05); }
+
+    .upload-status {
+        border: 2px solid #6366f1;
+    }
+    .upload-status.active { display: block; }
+    .upload-status .label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #4f46e5;
+        margin-bottom: 6px;
+    }
+    .upload-progress-bar {
+        height: 5px;
+        background: #e2e8f0;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .upload-progress-fill {
+        height: 100%;
+        background: var(--gradient-primary);
+        width: 0%;
+        transition: width 0.2s;
+    }
+
+    /* ============ CAMERA MODAL ============ */
+    .camera-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.92);
+        backdrop-filter: blur(6px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 999999;
+        padding: 16px;
+    }
+    .camera-modal.active { display: flex; }
+
+    .camera-container {
+        background: #1e293b;
+        border-radius: 20px;
+        padding: 16px;
+        max-width: 700px;
+        width: 100%;
+        max-height: 95vh;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+        border: 2px solid #6366f1;
+    }
+    .camera-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: white;
+    }
+    .camera-header h5 {
+        margin: 0;
+        font-weight: 700;
+        font-size: 1rem;
+    }
+    .camera-close {
+        background: rgba(255,255,255,0.1);
+        border: none;
+        color: white;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1.1rem;
+        transition: background 0.2s;
+    }
+    .camera-close:hover { background: rgba(255,255,255,0.2); }
+    .camera-preview-wrapper {
+        position: relative;
+        background: black;
+        border-radius: 12px;
+        overflow: hidden;
+        aspect-ratio: 16 / 9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .camera-preview-wrapper video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+    .camera-rec-indicator {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        display: none;
+        align-items: center;
+        gap: 8px;
+        background: rgba(0,0,0,0.6);
+        color: white;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.8rem;
+    }
+    .camera-rec-indicator.active { display: flex; }
+    .camera-rec-dot {
+        width: 8px;
+        height: 8px;
+        background: #ef4444;
+        border-radius: 50%;
+        animation: recBlink 1s infinite;
+    }
+    .camera-controls {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .camera-btn {
+        border: none;
+        padding: 10px 18px;
+        border-radius: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .camera-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .camera-btn.record { background: #ef4444; color: white; }
+    .camera-btn.record:hover:not(:disabled) { background: #dc2626; transform: scale(1.05); }
+    .camera-btn.stop { background: #6366f1; color: white; }
+    .camera-btn.stop:hover:not(:disabled) { background: #4f46e5; transform: scale(1.05); }
+    .camera-btn.send { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+    .camera-btn.send:hover:not(:disabled) { transform: scale(1.05); }
+    .camera-btn.retake { background: #64748b; color: white; }
+    .camera-btn.retake:hover:not(:disabled) { background: #475569; transform: scale(1.05); }
+    .camera-btn.cancel { background: rgba(255,255,255,0.1); color: white; }
+    .camera-btn.cancel:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
+    .camera-status { text-align: center; color: #94a3b8; font-size: 0.85rem; }
+    .camera-status.error { color: #f87171; }
+    .camera-timer {
+        text-align: center;
+        color: #10b981;
+        font-family: monospace;
+        font-weight: 700;
+        font-size: 1rem;
+    }
+
+    /* ============ NOTIFICATION BANNER ============ */
+    .notif-banner {
+        position: fixed;
+        top: 90px;
+        right: 16px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white;
+        padding: 14px 18px;
+        border-radius: 14px;
+        box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
+        font-weight: 600;
+        display: none;
+        z-index: 999999;
+        max-width: 320px;
+        animation: notifSlideIn 0.4s ease-out;
+        cursor: pointer;
+    }
+    .notif-banner.active { display: flex; align-items: center; gap: 12px; }
+    .notif-banner .notif-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+    .notif-banner .notif-body { min-width: 0; flex: 1; }
+    .notif-banner .notif-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .notif-banner .notif-text {
+        font-size: 0.78rem;
+        opacity: 0.9;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    @keyframes notifSlideIn {
+        from { transform: translateX(120%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* ============ LIGHTBOX ============ */
+    .lightbox {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.92);
+        backdrop-filter: blur(8px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 999999;
+        padding: 20px;
+    }
+    .lightbox.active { display: flex; }
+    .lightbox img {
+        max-width: 95%;
+        max-height: 95%;
+        border-radius: 12px;
+        box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+    }
+    .lightbox-close {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: white;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1.2rem;
+    }
+
+    /* ============ MOBILE RESPONSIVE ============ */
+    @media (max-width: 576px) {
+        .chat-wrapper { height: 82vh; border-radius: 12px; }
+        .chat-header { padding: 12px 14px; }
+        .chat-messages { padding: 14px 10px; }
+        .message-avatar { width: 30px; height: 30px; font-size: 0.75rem; }
+        .message-bubble { max-width: 85%; padding: 8px 12px; }
+        .message-content { font-size: 0.88rem; }
+        .chat-input { padding: 10px 12px; }
+        .chat-input input[type="text"] { padding: 10px 16px; font-size: 0.9rem; }
+        .emoji-picker-panel { left: 8px; right: 8px; width: auto; max-width: none; }
+        .notif-banner { left: 12px; right: 12px; max-width: none; }
+        .recording-panel, .upload-status { left: 8px; right: 8px; }
+        .camera-container { padding: 12px; border-radius: 16px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <!-- Notification banner -->
+    <div class="notif-banner" id="notifBanner">
+        <div class="notif-icon"><i class="fas fa-comment"></i></div>
+        <div class="notif-body">
+            <div class="notif-title" id="notifTitle">New message</div>
+            <div class="notif-text" id="notifText">Someone sent a message</div>
+        </div>
+    </div>
+
+    <div class="chat-wrapper">
+        <!-- Header -->
+        <div class="chat-header">
+            <div class="chat-header-info">
+                <h3><i class="fas fa-hashtag text-primary me-1"></i>{{ room.name }}</h3>
+                {% if room.description %}
+                    <small>{{ room.description }}</small>
+                {% endif %}
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div class="online-indicator">
+                    <span class="online-dot"></span>
+                    <span id="onlineCount">1</span> online
+                </div>
+                {% if room.creator_id == session.user_id %}
+                    <form method="POST" action="{{ url_for('delete_room', room_id=room.id) }}" style="display: inline;">
+                        <button type="submit" class="icon-btn" style="background: #fee2e2; color: #dc2626; width: 38px; height: 38px; font-size: 0.9rem;" onclick="return confirm('Delete this room?')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+                {% endif %}
+                <a href="{{ url_for('rooms') }}" class="icon-btn" style="text-decoration: none; width: 38px; height: 38px; font-size: 0.9rem;">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="chat-messages" id="messages">
+            {% if messages %}
+                {% for m in messages %}
+                    <div class="message-row {% if m.user_id == session.user_id %}own{% endif %}" data-message-id="{{ m.id }}">
+                        <div class="message-avatar">{{ m.author.username[0]|upper }}</div>
+                        <div class="message-bubble">
+                            <div class="message-header">
+                                <span class="message-author">{{ m.author.username }}</span>
+                                <span class="message-time">{{ m.created_at.strftime('%I:%M %p') }}</span>
+                                {% if m.user_id == session.user_id or room.creator_id == session.user_id %}
+                                    <button class="message-delete" data-delete-id="{{ m.id }}" title="Delete">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                {% endif %}
+                            </div>
+                            {% if m.content %}
+                                <div class="message-content">{{ m.content }}</div>
+                            {% endif %}
+                            {% if m.media_type == 'image' %}
+                                <div class="message-media">
+                                    <img src="{{ url_for('uploaded_file', filename=m.media_filename) }}" alt="image" loading="lazy" data-lightbox>
+                                </div>
+                            {% elif m.media_type == 'video' %}
+                                <div class="message-media">
+                                    <video controls preload="auto" playsinline>
+                                        <source src="{{ url_for('uploaded_file', filename=m.media_filename) }}" type="video/webm">
+                                    </video>
+                                </div>
+                            {% elif m.media_type == 'audio' %}
+                                <div class="message-media">
+                                    <audio controls preload="auto">
+                                        <source src="{{ url_for('uploaded_file', filename=m.media_filename) }}" type="audio/webm">
+                                    </audio>
+                                </div>
+                            {% elif m.media_original_name %}
+                                <a href="{{ url_for('uploaded_file', filename=m.media_filename) }}" download="{{ m.media_original_name }}" class="message-file-info">
+                                    <i class="fas fa-file"></i>
+                                    <div>
+                                        <span class="file-name">{{ m.media_original_name }}</span>
+                                        <span class="file-size">{{ (m.media_size / 1024) | round(1) }} KB</span>
+                                    </div>
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-chat" id="emptyState">
+                    <div class="emoji">💬</div>
+                    <h5>No messages yet</h5>
+                    <p>Be the first to say something!</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Recording panel -->
+        <div class="recording-panel" id="recordingPanel">
+            <div class="recording-dot"></div>
+            <div class="recording-timer" id="recordingTimer">0:00</div>
+            <div class="recording-actions">
+                <button class="rec-btn cancel" id="cancelRecording">Cancel</button>
+                <button class="rec-btn send" id="sendRecording">Send <i class="fas fa-paper-plane ms-1"></i></button>
+            </div>
+        </div>
+
+        <!-- Upload status -->
+        <div class="upload-status" id="uploadStatus">
+            <div class="label">
+                <span><i class="fas fa-cloud-upload-alt me-1"></i> Uploading...</span>
+                <span id="uploadPercent">0%</span>
+            </div>
+            <div class="upload-progress-bar">
+                <div class="upload-progress-fill" id="uploadProgressFill"></div>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="chat-input">
+            <div class="emoji-picker-panel" id="emojiPickerPanel">
+                <h6><i class="fas fa-smile me-1"></i> Pick an emoji</h6>
+                <div class="emoji-picker-grid" id="emojiPickerGrid"></div>
+            </div>
+
+            <input type="file" id="fileInput" style="display: none;">
+
+            <form id="messageForm">
+                <button type="button" class="icon-btn" id="emojiBtn" title="Emojis">
+                    <i class="fas fa-smile"></i>
+                </button>
+                <button type="button" class="icon-btn" id="attachBtn" title="Attach file">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <button type="button" class="icon-btn" id="micBtn" title="Voice message">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button type="button" class="icon-btn" id="cameraBtn" title="Video">
+                    <i class="fas fa-video"></i>
+                </button>
+                <input type="text" id="messageInput" placeholder="Type a message..." maxlength="1000" autocomplete="off">
+                <button type="submit" class="send-btn" id="sendBtn">
+                    <i class="fas fa-paper-plane"></i>
+                    <span>Send</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Camera Modal -->
+    <div class="camera-modal" id="cameraModal">
+        <div class="camera-container">
+            <div class="camera-header">
+                <h5><i class="fas fa-video me-2"></i>Record Video</h5>
+                <button class="camera-close" id="cameraClose">&times;</button>
+            </div>
+            <div class="camera-preview-wrapper">
+                <video id="cameraVideo" autoplay playsinline muted></video>
+                <div class="camera-rec-indicator" id="cameraRecIndicator">
+                    <div class="camera-rec-dot"></div>
+                    <span>Recording</span>
+                </div>
+            </div>
+            <div class="camera-timer" id="cameraTimer" style="display: none;">00:00</div>
+            <div class="camera-status" id="cameraStatus">Click <strong>Start Recording</strong> to begin.</div>
+            <div class="camera-controls" id="cameraControls"></div>
+        </div>
+    </div>
+
+    <div class="lightbox" id="lightbox">
+        <button class="lightbox-close" id="lightboxClose">&times;</button>
+        <img id="lightboxImg" src="" alt="">
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    'use strict';
+
+    const roomId = {{ room.id }};
+    const roomName = "{{ room.name }}";
+    const currentUserId = {{ session.user_id }};
+    const creatorId = {{ room.creator_id }};
+
+    const messagesContainer = document.getElementById('messages');
+    const messageForm = document.getElementById('messageForm');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const onlineCount = document.getElementById('onlineCount');
+    const emojiBtn = document.getElementById('emojiBtn');
+    const attachBtn = document.getElementById('attachBtn');
+    const micBtn = document.getElementById('micBtn');
+    const cameraBtn = document.getElementById('cameraBtn');
+    const fileInput = document.getElementById('fileInput');
+    const emojiPickerPanel = document.getElementById('emojiPickerPanel');
+    const emojiPickerGrid = document.getElementById('emojiPickerGrid');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const uploadPercent = document.getElementById('uploadPercent');
+    const uploadProgressFill = document.getElementById('uploadProgressFill');
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+    const lightboxClose = document.getElementById('lightboxClose');
+    const recordingPanel = document.getElementById('recordingPanel');
+    const recordingTimer = document.getElementById('recordingTimer');
+    const cancelRecording = document.getElementById('cancelRecording');
+    const sendRecording = document.getElementById('sendRecording');
+    const notifBanner = document.getElementById('notifBanner');
+    const notifTitle = document.getElementById('notifTitle');
+    const notifText = document.getElementById('notifText');
+
+    const cameraModal = document.getElementById('cameraModal');
+    const cameraVideo = document.getElementById('cameraVideo');
+    const cameraClose = document.getElementById('cameraClose');
+    const cameraStatus = document.getElementById('cameraStatus');
+    const cameraControls = document.getElementById('cameraControls');
+    const cameraRecIndicator = document.getElementById('cameraRecIndicator');
+    const cameraTimer = document.getElementById('cameraTimer');
+
+    let lastMessageId = 0;
+    document.querySelectorAll('[data-message-id]').forEach(function (el) {
+        const id = parseInt(el.dataset.messageId, 10);
+        if (id > lastMessageId) lastMessageId = id;
+    });
+
+    const ORIGINAL_TITLE = document.title;
+    let titleInterval = null;
+
+    // ============ NOTIFICATIONS ============
+    let audioCtx = null;
+    let audioUnlocked = false;
+
+    function unlockAudio() {
+        if (audioUnlocked) return;
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            audioCtx = new AudioCtx();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            audioUnlocked = true;
+        } catch (e) {}
+    }
+    ['click', 'keydown', 'touchstart'].forEach(function (evt) {
+        document.addEventListener(evt, function once() {
+            unlockAudio();
+            document.removeEventListener(evt, once);
+        }, { once: true });
+    });
+
+    function playDing() {
+        if (!audioUnlocked || !audioCtx) return;
+        try {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            [880, 1175].forEach(function (freq, i) {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.value = freq;
+                osc.type = 'sine';
+                const start = now + (i * 0.1);
+                gain.gain.setValueAtTime(0.0001, start);
+                gain.gain.exponentialRampToValueAtTime(0.35, start + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + 0.15);
+                osc.start(start);
+                osc.stop(start + 0.15);
+            });
+        } catch (e) {}
+    }
+
+    let notifTimeout = null;
+    function showBanner(title, text) {
+        notifTitle.textContent = title;
+        notifText.textContent = text;
+        notifBanner.classList.add('active');
+        if (notifTimeout) clearTimeout(notifTimeout);
+        notifTimeout = setTimeout(function () {
+            notifBanner.classList.remove('active');
+        }, 5000);
+    }
+
+    function startTitleFlash() {
+        if (titleInterval) return;
+        let toggle = false;
+        titleInterval = setInterval(function () {
+            document.title = toggle ? '💬 New message!' : ORIGINAL_TITLE;
+            toggle = !toggle;
+        }, 1000);
+    }
+    function stopTitleFlash() {
+        if (titleInterval) {
+            clearInterval(titleInterval);
+            titleInterval = null;
+        }
+        document.title = ORIGINAL_TITLE;
+    }
+
+    // ============ EMOJI ============
+    const emojis = ['😀','😁','😂','🤣','😊','😍','😘','😎','🤔','😴','😢','😭','😡','🤯','🥳','😷','🤒','👍','👎','❤️','💔','🔥','✨','⭐','🎉','🎊','🙏','👏','💪','🙌','✌️','🤝','💯','💬','💭','📌','🎯','🏆','🎵','🎨','☕','🍕','🍔','🍰','🍎','🌸','🌈','☀️','🌙','⚡','🚀','💡','🎁','🌟','🎈'];
+    emojis.forEach(function (em) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = em;
+        btn.dataset.emoji = em;
+        emojiPickerGrid.appendChild(btn);
+    });
+
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('#emojiBtn')) {
+            e.preventDefault();
+            e.stopPropagation();
+            emojiPickerPanel.classList.toggle('active');
+            return;
+        }
+        const emojiClicked = e.target.closest('[data-emoji]');
+        if (emojiClicked && emojiPickerGrid.contains(emojiClicked)) {
+            e.preventDefault();
+            e.stopPropagation();
+            messageInput.value += emojiClicked.dataset.emoji;
+            messageInput.focus();
+            return;
+        }
+        if (!emojiPickerPanel.contains(e.target) && !emojiBtn.contains(e.target)) {
+            emojiPickerPanel.classList.remove('active');
+        }
+    });
+
+    // ============ FILE UPLOAD ============
+    attachBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function () {
+        const file = fileInput.files[0];
+        if (!file) return;
+        if (file.size > 50 * 1024 * 1024) {
+            alert('File too large. Max 50 MB.');
+            fileInput.value = '';
+            return;
+        }
+        const formData = new FormData();
+        formData.append('file', file);
+        sendWithProgress(formData);
+        fileInput.value = '';
+    });
+
+    function sendWithProgress(formData, onSuccess) {
+        uploadStatus.classList.add('active');
+        uploadPercent.textContent = '0%';
+        uploadProgressFill.style.width = '0%';
+
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', function (e) {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                uploadPercent.textContent = percent + '%';
+                uploadProgressFill.style.width = percent + '%';
+            }
+        });
+
+        xhr.addEventListener('load', function () {
+            uploadStatus.classList.remove('active');
+            if (xhr.status === 200) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        const msg = data.message;
+                        msg.user_id = currentUserId;
+                        const emptyState = document.getElementById('emptyState');
+                        if (emptyState) emptyState.remove();
+                        messagesContainer.appendChild(createMessageElement(msg));
+                        lastMessageId = Math.max(lastMessageId, msg.id);
+                        scrollToBottom();
+                        if (onSuccess) onSuccess();
+                    } else {
+                        alert(data.error || 'Upload failed');
+                    }
+                } catch (err) { alert('Upload failed'); }
+            } else {
+                alert('Upload failed (status ' + xhr.status + ')');
+            }
+        });
+
+        xhr.addEventListener('error', function () {
+            uploadStatus.classList.remove('active');
+            alert('Network error during upload.');
+        });
+
+        xhr.open('POST', '/room/' + roomId + '/upload');
+        xhr.send(formData);
+    }
+
+    // ============ VOICE RECORDING ============
+    let mediaRecorder = null, audioChunks = [], recordingStartTime = 0, recordingInterval = null, recordingStream = null, recordedBlob = null;
+
+    micBtn.addEventListener('click', async function (e) {
+        e.preventDefault();
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            stopRecordingAndShowPanel();
+        } else {
+            await startRecording();
+        }
+    });
+
+    async function startRecording() {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('Voice recording not supported.');
+                return;
+            }
+            audioChunks = [];
+            recordedBlob = null;
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            recordingStream = stream;
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.addEventListener('dataavailable', function (event) {
+                if (event.data.size > 0) audioChunks.push(event.data);
+            });
+            mediaRecorder.start();
+            micBtn.classList.add('recording');
+            recordingPanel.classList.add('active');
+            recordingStartTime = Date.now();
+            recordingTimer.textContent = '0:00';
+            recordingInterval = setInterval(function () {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                recordingTimer.textContent = formatTime(elapsed);
+                if (elapsed >= 300) stopRecordingAndShowPanel();
+            }, 100);
+        } catch (err) {
+            alert(err.name === 'NotAllowedError' ? 'Mic permission denied.' : 'Recording failed.');
+        }
+    }
+
+    function stopRecordingAndShowPanel() {
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+        clearInterval(recordingInterval);
+        micBtn.classList.remove('recording');
+        mediaRecorder.addEventListener('stop', function () {
+            recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        }, { once: true });
+        mediaRecorder.stop();
+    }
+
+    sendRecording.addEventListener('click', async function () {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            await new Promise(function (resolve) {
+                mediaRecorder.addEventListener('stop', function () {
+                    recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    clearInterval(recordingInterval);
+                    micBtn.classList.remove('recording');
+                    resolve();
+                }, { once: true });
+                mediaRecorder.stop();
+            });
+        }
+        if (!recordedBlob || recordedBlob.size === 0) {
+            alert('No recording found.');
+            return;
+        }
+        const file = new File([recordedBlob], 'voice-message.webm', { type: 'audio/webm' });
+        if (recordingStream) {
+            recordingStream.getTracks().forEach(function (t) { t.stop(); });
+            recordingStream = null;
+        }
+        recordingPanel.classList.remove('active');
+        const formData = new FormData();
+        formData.append('file', file);
+        sendWithProgress(formData);
+        recordedBlob = null;
+        audioChunks = [];
+        mediaRecorder = null;
+    });
+
+    cancelRecording.addEventListener('click', function () {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            try { mediaRecorder.stop(); } catch (e) {}
+        }
+        if (recordingStream) {
+            recordingStream.getTracks().forEach(function (t) { t.stop(); });
+            recordingStream = null;
+        }
+        clearInterval(recordingInterval);
+        audioChunks = [];
+        recordedBlob = null;
+        mediaRecorder = null;
+        recordingPanel.classList.remove('active');
+        micBtn.classList.remove('recording');
+    });
+
+    // ============ CAMERA ============
+    let cameraStream = null, cameraRecorder = null, cameraChunks = [], cameraRecordingStart = 0, cameraInterval = null, cameraRecordedBlob = null, cameraState = 'preview';
+
+    cameraBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        openCamera();
+    });
+
+    async function openCamera() {
+        cameraModal.classList.add('active');
+        cameraStatus.textContent = 'Starting camera...';
+        cameraStatus.classList.remove('error');
+        cameraState = 'preview';
+
+        try {
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: true
+                });
+            } catch (audioErr) {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+            }
+            cameraStream = stream;
+            cameraVideo.srcObject = stream;
+            cameraVideo.muted = true;
+            cameraVideo.play();
+            cameraStatus.textContent = 'Camera ready.';
+            renderCameraControls();
+        } catch (err) {
+            cameraStatus.classList.add('error');
+            cameraStatus.textContent = 'Camera error: ' + err.message;
+            renderCameraControls();
+        }
+    }
+
+    function renderCameraControls() {
+        cameraControls.innerHTML = '';
+        if (cameraState === 'preview') {
+            const startBtn = document.createElement('button');
+            startBtn.className = 'camera-btn record';
+            startBtn.innerHTML = '<i class="fas fa-circle"></i> Start Recording';
+            startBtn.addEventListener('click', startCameraRecording);
+            cameraControls.appendChild(startBtn);
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'camera-btn cancel';
+            cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+            cancelBtn.addEventListener('click', closeCamera);
+            cameraControls.appendChild(cancelBtn);
+            cameraRecIndicator.classList.remove('active');
+            cameraTimer.style.display = 'none';
+        } else if (cameraState === 'recording') {
+            const stopBtn = document.createElement('button');
+            stopBtn.className = 'camera-btn stop';
+            stopBtn.innerHTML = '<i class="fas fa-stop"></i> Stop Recording';
+            stopBtn.addEventListener('click', stopCameraRecording);
+            cameraControls.appendChild(stopBtn);
+            cameraRecIndicator.classList.add('active');
+            cameraTimer.style.display = 'block';
+        } else if (cameraState === 'review') {
+            const sendBtn = document.createElement('button');
+            sendBtn.className = 'camera-btn send';
+            sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send';
+            sendBtn.addEventListener('click', sendCameraVideo);
+            cameraControls.appendChild(sendBtn);
+            const retakeBtn = document.createElement('button');
+            retakeBtn.className = 'camera-btn retake';
+            retakeBtn.innerHTML = '<i class="fas fa-redo"></i> Retake';
+            retakeBtn.addEventListener('click', retakeCameraVideo);
+            cameraControls.appendChild(retakeBtn);
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'camera-btn cancel';
+            cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+            cancelBtn.addEventListener('click', closeCamera);
+            cameraControls.appendChild(cancelBtn);
+            cameraRecIndicator.classList.remove('active');
+        }
+    }
+
+    function startCameraRecording() {
+        if (!cameraStream) return;
+        cameraState = 'recording';
+        cameraChunks = [];
+        cameraRecordedBlob = null;
+
+        const codecs = ['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm;codecs=h264,opus','video/webm','video/mp4'];
+        let mime = '';
+        for (const c of codecs) {
+            if (MediaRecorder.isTypeSupported(c)) { mime = c; break; }
+        }
+        const options = mime ? { mimeType: mime } : {};
+        try {
+            cameraRecorder = new MediaRecorder(cameraStream, options);
+        } catch (err) {
+            cameraRecorder = new MediaRecorder(cameraStream);
+        }
+
+        cameraRecorder.addEventListener('dataavailable', function (event) {
+            if (event.data.size > 0) cameraChunks.push(event.data);
+        });
+        cameraRecorder.addEventListener('stop', function () {
+            cameraRecordedBlob = new Blob(cameraChunks, { type: 'video/webm' });
+            cameraState = 'review';
+            cameraStatus.textContent = 'Recording complete.';
+            renderCameraControls();
+            cameraVideo.srcObject = null;
+            cameraVideo.src = URL.createObjectURL(cameraRecordedBlob);
+            cameraVideo.muted = false;
+            cameraVideo.controls = true;
+            cameraVideo.play();
+        });
+
+        cameraRecorder.start();
+        cameraRecordingStart = Date.now();
+        cameraInterval = setInterval(function () {
+            const elapsed = Math.floor((Date.now() - cameraRecordingStart) / 1000);
+            cameraTimer.textContent = formatTime(elapsed);
+            if (elapsed >= 300) stopCameraRecording();
+        }, 100);
+        cameraTimer.textContent = '0:00';
+        renderCameraControls();
+    }
+
+    function stopCameraRecording() {
+        if (!cameraRecorder || cameraRecorder.state === 'inactive') return;
+        clearInterval(cameraInterval);
+        cameraRecorder.stop();
+    }
+
+    function retakeCameraVideo() {
+        cameraRecordedBlob = null;
+        cameraChunks = [];
+        if (cameraStream) {
+            cameraVideo.srcObject = cameraStream;
+            cameraVideo.muted = true;
+            cameraVideo.controls = false;
+            cameraVideo.play();
+        }
+        cameraState = 'preview';
+        cameraStatus.textContent = 'Camera ready.';
+        renderCameraControls();
+    }
+
+    function sendCameraVideo() {
+        if (!cameraRecordedBlob || cameraRecordedBlob.size === 0) {
+            alert('No recording found.');
+            return;
+        }
+        const file = new File([cameraRecordedBlob], 'video-message.webm', { type: 'video/webm' });
+        const formData = new FormData();
+        formData.append('file', file);
+        closeCamera();
+        sendWithProgress(formData);
+    }
+
+    function closeCamera() {
+        if (cameraRecorder && cameraRecorder.state !== 'inactive') {
+            try { cameraRecorder.stop(); } catch (e) {}
+        }
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(function (t) { t.stop(); });
+            cameraStream = null;
+        }
+        clearInterval(cameraInterval);
+        cameraChunks = [];
+        cameraRecordedBlob = null;
+        cameraRecorder = null;
+        cameraState = 'preview';
+        cameraVideo.srcObject = null;
+        cameraVideo.src = '';
+        cameraVideo.controls = false;
+        cameraModal.classList.remove('active');
+    }
+
+    cameraClose.addEventListener('click', closeCamera);
+
+    // ============ MESSAGE ELEMENT ============
+    function createMessageElement(msg) {
+        const isOwn = msg.user_id === currentUserId;
+        const canDelete = isOwn || creatorId === currentUserId;
+
+        const row = document.createElement('div');
+        row.className = 'message-row' + (isOwn ? ' own' : '');
+        row.dataset.messageId = msg.id;
+
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.textContent = (msg.username || '?')[0].toUpperCase();
+
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+
+        const deleteBtn = canDelete
+            ? '<button class="message-delete" data-delete-id="' + msg.id + '" title="Delete"><i class="fas fa-times"></i></button>'
+            : '';
+
+        let contentHtml = '';
+        if (msg.content) {
+            contentHtml = '<div class="message-content">' + escapeHtml(msg.content) + '</div>';
+        }
+
+        const origin = window.location.origin;
+        function absoluteUrl(url) {
+            if (!url) return '';
+            if (url.startsWith('http')) return url;
+            return origin + url;
+        }
+
+        let mediaHtml = '';
+        if (msg.media_type === 'image' && msg.media_url) {
+            mediaHtml = '<div class="message-media"><img src="' + absoluteUrl(msg.media_url) + '" alt="image" loading="lazy" data-lightbox></div>';
+        } else if (msg.media_type === 'video' && msg.media_url) {
+            mediaHtml = '<div class="message-media"><video controls preload="auto" playsinline><source src="' + absoluteUrl(msg.media_url) + '" type="video/webm"></video></div>';
+        } else if (msg.media_type === 'audio' && msg.media_url) {
+            mediaHtml = '<div class="message-media"><audio controls preload="auto"><source src="' + absoluteUrl(msg.media_url) + '" type="audio/webm"></audio></div>';
+        } else if (msg.media_original_name && msg.media_url) {
+            const size = msg.media_size ? formatSize(msg.media_size) : '';
+            mediaHtml = '<a href="' + absoluteUrl(msg.media_url) + '" download="' + escapeHtml(msg.media_original_name) + '" class="message-file-info"><i class="fas fa-file"></i><div><span class="file-name">' + escapeHtml(msg.media_original_name) + '</span><span class="file-size">' + size + '</span></div></a>';
+        }
+
+        bubble.innerHTML =
+            '<div class="message-header">' +
+                '<span class="message-author">' + escapeHtml(msg.username) + '</span>' +
+                '<span class="message-time">' + escapeHtml(msg.created_at) + '</span>' +
+                deleteBtn +
+            '</div>' +
+            contentHtml +
+            mediaHtml;
+
+        row.appendChild(avatar);
+        row.appendChild(bubble);
+
+        setTimeout(function () {
+            const video = row.querySelector('video');
+            if (video) { try { video.load(); } catch (e) {} }
+            const audio = row.querySelector('audio');
+            if (audio) { try { audio.load(); } catch (e) {} }
+        }, 50);
+
+        return row;
+    }
+
+    // ============ DELETE ============
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-delete-id]');
+        if (!btn) return;
+        e.preventDefault();
+        const messageId = btn.dataset.deleteId;
+        if (!confirm('Delete this message?')) return;
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/message/' + messageId + '/delete';
+        document.body.appendChild(form);
+        form.submit();
+    });
+
+    // ============ LIGHTBOX ============
+    document.addEventListener('click', function (e) {
+        const img = e.target.closest('[data-lightbox]');
+        if (img) {
+            e.preventDefault();
+            lightboxImg.src = img.src;
+            lightbox.classList.add('active');
+        }
+    });
+    lightboxClose.addEventListener('click', function () { lightbox.classList.remove('active'); });
+    lightbox.addEventListener('click', function (e) {
+        if (e.target === lightbox) lightbox.classList.remove('active');
+    });
+
+    // ============ POLL MESSAGES ============
+    async function loadMessages() {
+        try {
+            const res = await fetch('/room/' + roomId + '/messages?since_id=' + lastMessageId);
+            if (!res.ok) return;
+            const data = await res.json();
+
+            if (data.messages && data.messages.length > 0) {
+                const emptyState = document.getElementById('emptyState');
+                if (emptyState) emptyState.remove();
+
+                const newMessages = data.messages.filter(function (m) { return m.id > lastMessageId; });
+                const otherMessages = newMessages.filter(function (m) { return m.user_id !== currentUserId; });
+
+                otherMessages.forEach(function (msg) {
+                    let preview = msg.content || '';
+                    if (!preview) {
+                        if (msg.media_type === 'image') preview = '📷 Photo';
+                        else if (msg.media_type === 'video') preview = '🎥 Video';
+                        else if (msg.media_type === 'audio') preview = '🎤 Voice message';
+                        else if (msg.media_original_name) preview = '📎 ' + msg.media_original_name;
+                        else preview = 'New message';
+                    }
+                    if (preview.length > 60) preview = preview.substring(0, 60) + '...';
+                    playDing();
+                    showBanner(msg.username + ' in #' + roomName, preview);
+                    if (!document.hasFocus()) startTitleFlash();
+                });
+
+                newMessages.forEach(function (msg) {
+                    const element = createMessageElement(msg);
+                    messagesContainer.appendChild(element);
+                    lastMessageId = Math.max(lastMessageId, msg.id);
+                    if (msg.user_id !== currentUserId) {
+                        element.classList.add('new-message-pulse');
+                        setTimeout(function () { element.classList.remove('new-message-pulse'); }, 700);
+                    }
+                });
+                scrollToBottom();
+            }
+        } catch (err) {
+            console.error('Failed to load messages:', err);
+        }
+    }
+
+    // ============ SEND TEXT ============
+    messageForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const content = messageInput.value.trim();
+        if (!content) return;
+        sendBtn.disabled = true;
+        try {
+            const res = await fetch('/room/' + roomId + '/send', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content: content})
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                messageInput.value = '';
+                messageInput.focus();
+                emojiPickerPanel.classList.remove('active');
+                const msg = data.message;
+                msg.user_id = currentUserId;
+                const emptyState = document.getElementById('emptyState');
+                if (emptyState) emptyState.remove();
+                messagesContainer.appendChild(createMessageElement(msg));
+                lastMessageId = Math.max(lastMessageId, msg.id);
+                scrollToBottom();
+            } else {
+                alert(data.error || 'Failed to send');
+            }
+        } catch (err) {
+            alert('Network error');
+        } finally {
+            sendBtn.disabled = false;
+        }
+    });
+
+    // ============ ONLINE ============
+    async function loadOnlineUsers() {
+        try {
+            const res = await fetch('/room/' + roomId + '/online');
+            if (!res.ok) return;
+            const data = await res.json();
+            onlineCount.textContent = data.count;
+        } catch (err) {}
+    }
+
+    // ============ UTILS ============
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+    function formatTime(seconds) {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+    function scrollToBottom() {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // ============ START ============
+    scrollToBottom();
+    loadOnlineUsers();
+    setInterval(loadMessages, 3000);
+    setInterval(loadOnlineUsers, 10000);
+
+    window.addEventListener('focus', function () {
+        stopTitleFlash();
+        notifBanner.classList.remove('active');
+        loadMessages();
+        loadOnlineUsers();
+    });
+
+    setTimeout(function () {
+        document.querySelectorAll('video').forEach(function (v) { try { v.load(); } catch (e) {} });
+        document.querySelectorAll('audio').forEach(function (a) { try { a.load(); } catch (e) {} });
+    }, 500);
+
+    console.log('✅ Chat ready');
+})();
+</script>
+{% endblock %}

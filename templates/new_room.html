@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Create Room{% endblock %}
+
+{% block content %}
+    <div class="row justify-content-center">
+        <div class="col-md-7">
+            <div class="text-center mb-4">
+                <div style="font-size: 3rem;">🏠</div>
+                <h2 class="fw-bold mt-2">Create New Room</h2>
+                <p class="text-muted">Start a conversation on any topic</p>
+            </div>
+
+            <form method="POST">
+                <div class="mb-3">
+                    <label for="name" class="form-label"><i class="fas fa-hashtag me-1 text-primary"></i> Room Name *</label>
+                    <input type="text" class="form-control" id="name" name="name"
+                           value="{{ name or '' }}" placeholder="e.g., general, tech-talk, help" required>
+                    <div class="form-text">Short, simple, and easy to type</div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="description" class="form-label"><i class="fas fa-align-left me-1 text-primary"></i> Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="3"
+                              placeholder="What's this room about? (optional)">{{ description or '' }}</textarea>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="submit" class="btn btn-primary flex-fill py-3">
+                        <i class="fas fa-plus me-1"></i> Create Room
+                    </button>
+                    <a href="{{ url_for('rooms') }}" class="btn btn-secondary flex-fill py-3">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}
