@@ -67,5 +67,5 @@ This app is deployed on Render's free tier, which uses ephemeral storage:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/username/chat_app.git
+   git clone https://github.com/guyodika6891-lgtm/chat_app.git
    cd chat_app
