@@ -45,7 +45,7 @@ A full-featured real-time chat application with text, emoji, photos, videos, voi
 
 ## 🚀 Live Demo
 
-🔗 [View Live App](https://chat-app.onrender.com) *(update after deployment)*
+🔗 [View Live App](https://chat-app-1-3s6i.onrender.com) *(update after deployment)*
 
 ## ⚠️ Free Tier Note
 
